@@ -3,10 +3,6 @@ package com.lab4.lab4;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Serviço responsável por calcular as notas mínimas necessárias para alcançar média 7.
- * IMPLEMENTAÇÃO: stub (intencionalmente incompleta) — usado para criar testes que falhem.
- */
 public class CalculadoraNotasService {
 
     public static class Result {
@@ -33,33 +29,42 @@ public class CalculadoraNotasService {
         }
     }
 
-    /**
-     * Simula a atribuição de uma nota em uma atividade e recalcula as notas mínimas
-     * necessárias nas demais atividades para alcançar média final 7.
-     *
-     * OBS: Esta é uma implementação stub que retorna valores fixos (intencionalmente
-     * incorretos) para que os testes de especificação falhem até que a lógica seja
-     * implementada corretamente.
-     *
-     * @param activityName nome da atividade simulada
-     * @param grade nota simulada para a atividade
-     * @param weights mapa atividade -> peso (soma deve ser 1.0)
-     * @param currentGrades mapa atividade -> nota atual (pode estar vazio para atividade não corrigida)
-     * @return Result contendo um required, status e mapa com mínimo das demais atividades
-     */
     public Result simulateGrade(String activityName,
                                 double grade,
                                 Map<String, Double> weights,
                                 Map<String, Double> currentGrades) {
-        // Stub: retorna valores fixos e simples para compilar — não é a lógica real.
+        Map<String, Double> grades = new HashMap<>();
+        if (currentGrades != null) {
+            grades.putAll(currentGrades);
+        }
+        grades.put(activityName, grade);
+
         Map<String, Double> mins = new HashMap<>();
-        for (String k : weights.keySet()) {
-            mins.put(k, 0.0);
+
+        for (String a : weights.keySet()) {
+            double w = weights.getOrDefault(a, 0.0);
+            if (w == 0.0) {
+                mins.put(a, Double.POSITIVE_INFINITY);
+                continue;
+            }
+
+            double sumOthers = 0.0;
+            for (Map.Entry<String, Double> e : weights.entrySet()) {
+                String other = e.getKey();
+                if (other.equals(a)) continue;
+                double otherW = e.getValue();
+                double otherGrade = grades.getOrDefault(other, 0.0);
+                sumOthers += otherW * otherGrade;
+            }
+
+            double required = (7.0 - sumOthers) / w;
+            mins.put(a, required);
         }
 
-        // Sempre retorna "alcançável" e required 0.0 — isso tornará os testes de aceitação
-        // e unidade falhos até implementarmos a lógica correta.
-        return new Result(0.0, "alcançável", mins);
+        double requiredForSimulated = mins.getOrDefault(activityName, Double.POSITIVE_INFINITY);
+        String status = (requiredForSimulated > 10.0) ? "inviável" : "alcançável";
+
+        return new Result(requiredForSimulated, status, mins);
     }
 
 }
