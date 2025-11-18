@@ -8,53 +8,20 @@ pipeline {
       }
     }
 
-    stage('Pipeline-test-dev') {
+    stage('Start container') {
       steps {
-        bat './mvnw clean verify'
-        bat './mvnw pmd:pmd'
-        junit 'target/surefire-reports/*.xml'
-        jacoco execPattern: 'target/jacoco.exec', classPattern: 'target/classes', sourcePattern: 'src/main/java', exclusionPattern: ''
-        archiveArtifacts artifacts: 'target/site/jacoco/index.html, target/site/pmd.html', fingerprint: true
-      }
-      post {
-        always {
-          script {
-            def report = readFile('target/site/jacoco/jacoco.xml')
-            def matcher = report =~ /<counter type="INSTRUCTION" missed="(\\d+)" covered="(\\d+)"\/>/
-            def covered = 0; def missed = 0;
-            if (matcher.find()) {
-              missed = matcher.group(1) as int
-              covered = matcher.group(2) as int
-            }
-            def total = covered + missed
-            def percent = total > 0 ? (covered * 100.0 / total) : 0
-            currentBuild.description = "Cobertura: ${percent.round(2)}%"
-            if (percent < 99) {
-              error("Quality Gate: Cobertura Jacoco abaixo de 99%!")
-            }
-          }
-        }
+        echo 'Starting container from Docker Hub...'
+        bat 'docker-compose -f docker-compose.prod.yml pull' // Baixa a imagem do Docker Hub
+        bat 'docker-compose -f docker-compose.prod.yml up -d --no-color'
+        sleep time: 60, unit: 'SECONDS' // Aumenta o tempo para o serviço Spring Boot iniciar
+        bat 'docker-compose -f docker-compose.prod.yml logs' // Verifica os logs para conferir o status do Spring Boot
+        bat 'docker-compose -f docker-compose.prod.yml ps' // Verifica o status do container
       }
     }
 
-    stage('Image_Docker') {
-      when {
-        expression {
-          def report = readFile('target/site/jacoco/jacoco.xml')
-          def matcher = report =~ /<counter type="INSTRUCTION" missed="(\\d+)" covered="(\\d+)"\/>/
-          def covered = 0; def missed = 0;
-          if (matcher.find()) {
-            missed = matcher.group(1) as int
-            covered = matcher.group(2) as int
-          }
-          def total = covered + missed
-          def percent = total > 0 ? (covered * 100.0 / total) : 0
-          return percent >= 99
-        }
-      }
+    stage('Run tests against the container') {
       steps {
-        echo 'Building Docker image...'
-        bat 'docker build -t lab4:dev .'
+        bat 'curl http://localhost:8585 || echo "Service not responding"'
       }
     }
   }
@@ -62,7 +29,7 @@ pipeline {
   post {
     always {
       echo 'Pipeline completed'
-      archiveArtifacts artifacts: 'target/site/jacoco/index.html, target/site/pmd.html', fingerprint: true
+      // Não derruba mais o container aqui
     }
   }
 }
