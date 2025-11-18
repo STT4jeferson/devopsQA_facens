@@ -14,7 +14,7 @@ pipeline {
         sh '''
           set -e
 
-          # Descobre se existe docker-compose ou docker compose
+          echo "==> Descobrindo comando Docker Compose..."
           if command -v docker-compose >/dev/null 2>&1; then
             DC="docker-compose"
           elif docker compose version >/dev/null 2>&1; then
@@ -26,17 +26,32 @@ pipeline {
 
           echo "Usando comando: $DC"
 
-          $DC -f docker-compose.prod.yml pull
-          $DC -f docker-compose.prod.yml up -d --no-color
+          echo "==> Descobrindo arquivo docker-compose..."
+          if [ -f docker-compose.prod.yml ]; then
+            COMPOSE_FILE="docker-compose.prod.yml"
+          elif [ -f docker-compose.yml ]; then
+            COMPOSE_FILE="docker-compose.yml"
+          else
+            echo "ERRO: nenhum docker-compose.prod.yml ou docker-compose.yml encontrado na pasta:"
+            pwd
+            echo "Arquivos existentes:"
+            ls -la
+            exit 1
+          fi
+
+          echo "Usando arquivo: $COMPOSE_FILE"
+
+          $DC -f "$COMPOSE_FILE" pull
+          $DC -f "$COMPOSE_FILE" up -d --no-color
 
           echo "Aguardando o Spring Boot subir..."
           sleep 60
 
           echo "Logs do serviço:"
-          $DC -f docker-compose.prod.yml logs
+          $DC -f "$COMPOSE_FILE" logs
 
           echo "Status dos containers:"
-          $DC -f docker-compose.prod.yml ps
+          $DC -f "$COMPOSE_FILE" ps
         '''
       }
     }
@@ -63,7 +78,16 @@ pipeline {
       //   else
       //     exit 0
       //   fi
-      //   $DC -f docker-compose.prod.yml down
+      //
+      //   if [ -f docker-compose.prod.yml ]; then
+      //     COMPOSE_FILE="docker-compose.prod.yml"
+      //   elif [ -f docker-compose.yml ]; then
+      //     COMPOSE_FILE="docker-compose.yml"
+      //   else
+      //     exit 0
+      //   fi
+      //
+      //   $DC -f "$COMPOSE_FILE" down
       // '''
     }
   }
