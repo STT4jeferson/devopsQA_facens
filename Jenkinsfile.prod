@@ -11,17 +11,42 @@ pipeline {
     stage('Start container') {
       steps {
         echo 'Starting container from Docker Hub...'
-        sh 'docker-compose -f docker-compose.prod.yml pull'              // Baixa a imagem do Docker Hub
-        sh 'docker-compose -f docker-compose.prod.yml up -d --no-color'  // Sobe o container em background
-        sleep time: 60, unit: 'SECONDS'                                  // Tempo para o Spring Boot iniciar
-        sh 'docker-compose -f docker-compose.prod.yml logs'              // Mostra os logs do serviço
-        sh 'docker-compose -f docker-compose.prod.yml ps'                // Mostra o status dos containers
+        sh '''
+          set -e
+
+          # Descobre se existe docker-compose ou docker compose
+          if command -v docker-compose >/dev/null 2>&1; then
+            DC="docker-compose"
+          elif docker compose version >/dev/null 2>&1; then
+            DC="docker compose"
+          else
+            echo "ERRO: nem 'docker-compose' nem 'docker compose' encontrados no PATH."
+            exit 1
+          fi
+
+          echo "Usando comando: $DC"
+
+          $DC -f docker-compose.prod.yml pull
+          $DC -f docker-compose.prod.yml up -d --no-color
+
+          echo "Aguardando o Spring Boot subir..."
+          sleep 60
+
+          echo "Logs do serviço:"
+          $DC -f docker-compose.prod.yml logs
+
+          echo "Status dos containers:"
+          $DC -f docker-compose.prod.yml ps
+        '''
       }
     }
 
     stage('Run tests against the container') {
       steps {
-        sh 'curl http://localhost:8585 || echo "Service not responding"'
+        sh '''
+          echo "Verificando se o serviço está respondendo em http://localhost:8585 ..."
+          curl -v http://localhost:8585 || echo "Service not responding"
+        '''
       }
     }
   }
@@ -29,7 +54,17 @@ pipeline {
   post {
     always {
       echo 'Pipeline completed'
-      // Não derruba mais o container aqui
+      // Se quiser derrubar o container depois, pode descomentar:
+      // sh '''
+      //   if command -v docker-compose >/dev/null 2>&1; then
+      //     DC="docker-compose"
+      //   elif docker compose version >/dev/null 2>&1; then
+      //     DC="docker compose"
+      //   else
+      //     exit 0
+      //   fi
+      //   $DC -f docker-compose.prod.yml down
+      // '''
     }
   }
 
