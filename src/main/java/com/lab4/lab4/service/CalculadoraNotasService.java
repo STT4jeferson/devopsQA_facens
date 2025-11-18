@@ -1,11 +1,19 @@
 package com.lab4.lab4.service;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.lab4.lab4.dto.OperacaoDTO;
+import com.lab4.lab4.entity.Operacao;
+import com.lab4.lab4.repository.OperacaoRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.*;
 
-
+@Service
 public class CalculadoraNotasService {
 
+    @Autowired
+    private OperacaoRepository operacaoRepository;
+
+    // Lógica original mantida para simulação de notas
     public static class Result {
         private final double required;
         private final String status;
@@ -88,5 +96,43 @@ public class CalculadoraNotasService {
 
     private String statusFromRequired(double required) {
         return (required > 10.0) ? "inviável" : "alcançável";
+    }
+
+    // Novo método: cálculo e persistência de operação simples (exemplo)
+    public OperacaoDTO calcular(OperacaoDTO dto) {
+        double resultado = 0.0;
+        switch (dto.getTipo().toLowerCase()) {
+            case "soma":
+                resultado = dto.getValor1() + dto.getValor2();
+                break;
+            case "subtracao":
+                resultado = dto.getValor1() - dto.getValor2();
+                break;
+            case "multiplicacao":
+                resultado = dto.getValor1() * dto.getValor2();
+                break;
+            case "divisao":
+                if (dto.getValor2() != 0) {
+                    resultado = dto.getValor1() / dto.getValor2();
+                } else {
+                    throw new IllegalArgumentException("Divisão por zero não é permitida");
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("Tipo de operação inválido");
+        }
+        Operacao operacao = Operacao.builder()
+                .tipo(dto.getTipo())
+                .valor1(dto.getValor1())
+                .valor2(dto.getValor2())
+                .resultado(resultado)
+                .build();
+        operacaoRepository.save(operacao);
+        dto.setResultado(resultado);
+        return dto;
+    }
+
+    public Optional<Operacao> buscarPorId(Long id) {
+        return operacaoRepository.findById(id);
     }
 }

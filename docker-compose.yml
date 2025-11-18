@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  lab4:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    depends_on:
+      - h2
+  h2:
+    image: oscarfonts/h2
+    ports:
+      - "9092:9092"
+      - "81:81"
+    environment:
+      - H2_OPTIONS=-ifNotExists
