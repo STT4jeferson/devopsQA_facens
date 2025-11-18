@@ -1,0 +1,68 @@
+pipeline {
+  agent any
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Pipeline-test-dev') {
+      steps {
+        bat './mvnw clean verify'
+        bat './mvnw pmd:pmd'
+        junit 'target/surefire-reports/*.xml'
+        jacoco execPattern: 'target/jacoco.exec', classPattern: 'target/classes', sourcePattern: 'src/main/java', exclusionPattern: ''
+        archiveArtifacts artifacts: 'target/site/jacoco/index.html, target/site/pmd.html', fingerprint: true
+      }
+      post {
+        always {
+          script {
+            def report = readFile('target/site/jacoco/jacoco.xml')
+            def matcher = report =~ /<counter type="INSTRUCTION" missed="(\\d+)" covered="(\\d+)"\/>/
+            def covered = 0; def missed = 0;
+            if (matcher.find()) {
+              missed = matcher.group(1) as int
+              covered = matcher.group(2) as int
+            }
+            def total = covered + missed
+            def percent = total > 0 ? (covered * 100.0 / total) : 0
+            currentBuild.description = "Cobertura: ${percent.round(2)}%"
+            if (percent < 99) {
+              error("Quality Gate: Cobertura Jacoco abaixo de 99%!")
+            }
+          }
+        }
+      }
+    }
+
+    stage('Image_Docker') {
+      when {
+        expression {
+          def report = readFile('target/site/jacoco/jacoco.xml')
+          def matcher = report =~ /<counter type="INSTRUCTION" missed="(\\d+)" covered="(\\d+)"\/>/
+          def covered = 0; def missed = 0;
+          if (matcher.find()) {
+            missed = matcher.group(1) as int
+            covered = matcher.group(2) as int
+          }
+          def total = covered + missed
+          def percent = total > 0 ? (covered * 100.0 / total) : 0
+          return percent >= 99
+        }
+      }
+      steps {
+        echo 'Building Docker image...'
+        bat 'docker build -t lab4:dev .'
+      }
+    }
+  }
+
+  post {
+    always {
+      echo 'Pipeline completed'
+      archiveArtifacts artifacts: 'target/site/jacoco/index.html, target/site/pmd.html', fingerprint: true
+    }
+  }
+}
