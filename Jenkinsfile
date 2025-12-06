@@ -17,12 +17,24 @@ pipeline {
       }
     }
 
-    stage('Trivy_FS_PreBuild') {
-      steps {
-        sh "mkdir -p ${TRIVY_CACHE}"
-        sh "docker run --rm -v ${WORKSPACE}:/workspace -v ${WORKSPACE}/${TRIVY_CACHE}:/root/.cache ${TRIVY_IMAGE} fs --exit-code 1 --severity HIGH,CRITICAL --no-progress --format table -o trivy-fs.txt /workspace"
-      }
+  stage('Trivy_FS_PreBuild') {
+    steps {
+      sh "mkdir -p ${TRIVY_CACHE}"
+      sh """
+        docker run --rm \
+          -v ${WORKSPACE}:/workspace \
+          -v ${WORKSPACE}/${TRIVY_CACHE}:/root/.cache \
+          ${TRIVY_IMAGE} fs \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --no-progress \
+            --format table \
+            -o /workspace/trivy-fs.txt \
+            /workspace/pom.xml /workspace/src
+      """
     }
+  }
 
     stage('Pre-Build') {
       steps {
