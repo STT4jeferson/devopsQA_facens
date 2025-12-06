@@ -70,6 +70,9 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>com.lab4.calculator.GradeCalculatorApplication</mainClass>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -77,6 +80,7 @@
 				<version>3.2.5</version>
 				<configuration>
 					<useModulePath>false</useModulePath>
+					<argLine>${argLine} -Djdk.attach.allowAttachSelf=true</argLine>
 				</configuration>
 			</plugin>
 			<plugin>
