@@ -42,10 +42,10 @@ MAVEN_USER_HOME=.m2 ./mvnw clean verify
 - PMD executa em validate/verify e o pipeline publica `target/pmd.xml`.
 - Testes criados para entity/value objects, repository (@DataJpaTest), services (Mockito/H2), controller (@WebMvcTest) e contexto (@SpringBootTest com porta randômica).
 
-## Jenkins (Pipeline DEV + Staging)
-- `Jenkinsfile` único (Groovy Pipeline) com estágios: **Pre-Build** (pmd), **Pipeline-test-dev** (clean verify + JUnit/Jacoco/PMD), **QualityGate-99** (jacoco.xml), **Image_Docker** (build `lab4/calculator:dev` só se gate aprovar) e **Deploy_Staging** (sobe container via `docker-compose.staging.yml` em 8081 e faz smoke `curl` no Swagger).
-- Quality Gate >=99% bloqueia build da imagem e o deploy.
-- Relatórios arquivados: Jacoco + PMD + JUnit.
+## Jenkins (Pipeline DEV + Staging + Trivy)
+- `Jenkinsfile` único (Groovy Pipeline) com estágios: **Trivy_FS_PreBuild** (scan SCA/FS severidade HIGH/CRITICAL), **Pre-Build** (PMD), **Pipeline-test-dev** (clean verify + JUnit/Jacoco/PMD), **QualityGate-99** (jacoco.xml), **Image_Docker** (build `lab4/calculator:dev` só se gate aprovar), **Trivy_Image** (scan da imagem docker) e **Deploy_Staging** (docker-compose.staging.yml em 8081 + smoke `curl` no Swagger).
+- Quality Gate >=99% e Trivy sem findings HIGH/CRITICAL bloqueiam build/deploy.
+- Relatórios arquivados: Jacoco, PMD, JUnit e trivy-fs/image.
 
 ## Docker
 ```bash
