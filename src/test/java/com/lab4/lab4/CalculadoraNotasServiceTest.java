@@ -108,4 +108,16 @@ class CalculadoraNotasServiceTest {
         assertNotNull(r);
         assertTrue(!Double.isNaN(r.getRequired()), "Required should be a number");
     }
+
+    @Test
+    void whenWeightsAreNull_throwIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.simulateGrade("a1", 5.0, null, new HashMap<>()));
+    }
+
+    @Test
+    void whenWeightsAreEmpty_throwIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.simulateGrade("a1", 5.0, new HashMap<>(), new HashMap<>()));
+    }
 }
