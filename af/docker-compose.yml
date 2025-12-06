@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  calculator-api:
+    build: .
+    image: lab4/calculator:dev
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+    restart: unless-stopped
