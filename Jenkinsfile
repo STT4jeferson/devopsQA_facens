@@ -5,6 +5,8 @@ pipeline {
     MAVEN_CMD = "./mvnw -Dmaven.repo.local=.m2/repository"
     QUALITY_OK = "false"
     IMAGE_TAG = "lab4/calculator:dev"
+    TRIVY_IMAGE = "aquasec/trivy:0.57.1"
+    TRIVY_CACHE = ".trivy-cache"
   }
 
   stages {
@@ -12,6 +14,13 @@ pipeline {
       steps {
         checkout scm
         sh 'chmod +x mvnw'
+      }
+    }
+
+    stage('Trivy_FS_PreBuild') {
+      steps {
+        sh "mkdir -p ${TRIVY_CACHE}"
+        sh "docker run --rm -v ${WORKSPACE}:/workspace -v ${WORKSPACE}/${TRIVY_CACHE}:/root/.cache ${TRIVY_IMAGE} fs --exit-code 1 --severity HIGH,CRITICAL --no-progress --format table -o trivy-fs.txt /workspace"
       }
     }
 
@@ -51,6 +60,16 @@ pipeline {
       }
     }
 
+    stage('Trivy_Image') {
+      when {
+        expression { env.QUALITY_OK == 'true' }
+      }
+      steps {
+        sh "mkdir -p ${TRIVY_CACHE}"
+        sh "docker run --rm -v ${WORKSPACE}/${TRIVY_CACHE}:/root/.cache -v /var/run/docker.sock:/var/run/docker.sock ${TRIVY_IMAGE} image --exit-code 1 --severity HIGH,CRITICAL --no-progress --format table -o trivy-image.txt ${IMAGE_TAG}"
+      }
+    }
+
     stage('Deploy_Staging') {
       when {
         expression { env.QUALITY_OK == 'true' }
@@ -65,7 +84,7 @@ pipeline {
 
   post {
     always {
-      archiveArtifacts artifacts: 'target/site/jacoco/**,target/pmd.xml', fingerprint: true
+      archiveArtifacts artifacts: 'target/site/jacoco/**,target/pmd.xml,trivy-fs.txt,trivy-image.txt', fingerprint: true
     }
     success {
       echo 'Pipeline concluído com aprovação de 99%+'   
