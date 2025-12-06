@@ -55,22 +55,31 @@ pipeline {
     stage('QualityGate-99') {
       steps {
         script {
-          def coverage = sh(
-            returnStdout: true,
-            script: """python - <<'PY'
-import xml.etree.ElementTree as ET
-root = ET.parse('target/site/jacoco/jacoco.xml').getroot()
-ctr = root.find("counter[@type='INSTRUCTION']")
-covered = float(ctr.get('covered'))
-missed = float(ctr.get('missed'))
-ratio = covered / (covered + missed) if (covered + missed) else 0
-print(f'{ratio:.4f}')
-PY"""
-          ).trim()
+          // Lê o XML do JaCoCo gerado pelo maven-jacoco-plugin
+          def jacocoXml = readFile 'target/site/jacoco/jacoco.xml'
+          def root = new XmlSlurper().parseText(jacocoXml)
 
-          env.QUALITY_OK = (coverage.toBigDecimal() >= 0.99).toString()
+          // Procura o counter do tipo INSTRUCTION
+          def instructionCounter = root.counter.find { it.@type == 'INSTRUCTION' }
+          if (!instructionCounter) {
+            error "Counter INSTRUCTION não encontrado no jacoco.xml"
+          }
+
+          BigDecimal covered = instructionCounter.@covered.toBigDecimal()
+          BigDecimal missed  = instructionCounter.@missed.toBigDecimal()
+          BigDecimal total   = covered + missed
+          BigDecimal ratio   = (total > 0 ? covered / total : 0)
+
+          // Formata só pra mensagem
+          def coverageStr = ratio.setScale(4, BigDecimal.ROUND_HALF_UP).toString()
+
+          // Atualiza a variável de ambiente usada nas próximas stages
+          env.QUALITY_OK = (ratio >= 0.99).toString()
+
           if (env.QUALITY_OK != 'true') {
-            error "Coverage below 99% (${coverage})"
+            error "Coverage below 99% (${coverageStr})"
+          } else {
+            echo "Quality gate OK: INSTRUCTION coverage = ${coverageStr} (>= 0.99)"
           }
         }
       }
@@ -113,7 +122,11 @@ PY"""
       steps {
         sh "docker-compose -f docker-compose.staging.yml down || true"
         sh "docker-compose -f docker-compose.staging.yml up -d --remove-orphans"
-        sh "sleep 10 && curl -sSf http://localhost:8081/swagger-ui.html > /dev/null || (docker-compose -f docker-compose.staging.yml logs && exit 1)"
+        sh """
+          sleep 10 && \
+          curl -sSf http://localhost:8081/swagger-ui.html > /dev/null || \
+          (docker-compose -f docker-compose.staging.yml logs && exit 1)
+        """
       }
     }
   }
