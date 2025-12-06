@@ -2,9 +2,9 @@ pipeline {
   agent any
 
   environment {
-    MAVEN_CMD = "./mvnw -Dmaven.repo.local=.m2/repository"
-    QUALITY_OK = "false"
-    IMAGE_TAG = "lab4/calculator:dev"
+    MAVEN_CMD   = "./mvnw -Dmaven.repo.local=.m2/repository"
+    QUALITY_OK  = "false"
+    IMAGE_TAG   = "lab4/calculator:dev"
     TRIVY_IMAGE = "aquasec/trivy:0.57.1"
     TRIVY_CACHE = ".trivy-cache"
   }
@@ -17,24 +17,25 @@ pipeline {
       }
     }
 
-  stage('Trivy_FS_PreBuild') {
-    steps {
-      sh "mkdir -p ${TRIVY_CACHE}"
-      sh """
-        docker run --rm \
-          -v ${WORKSPACE}:/workspace \
-          -v ${WORKSPACE}/${TRIVY_CACHE}:/root/.cache \
-          ${TRIVY_IMAGE} fs \
-            --scanners vuln \
-            --severity HIGH,CRITICAL \
-            --exit-code 1 \
-            --no-progress \
-            --format table \
-            -o /workspace/trivy-fs.txt \
-            /workspace/pom.xml /workspace/src
-      """
+    stage('Trivy_FS_PreBuild') {
+      steps {
+        sh "mkdir -p ${TRIVY_CACHE}"
+        sh """
+          docker run --rm \
+            -v ${WORKSPACE}:/workspace \
+            -v ${WORKSPACE}/${TRIVY_CACHE}:/root/.cache \
+            ${TRIVY_IMAGE} fs \
+              --scanners vuln \
+              --severity HIGH,CRITICAL \
+              --exit-code 1 \
+              --no-progress \
+              --format table \
+              --skip-dirs /workspace/target,/workspace/.m2,/workspace/.git \
+              -o /workspace/trivy-fs.txt \
+              /workspace
+        """
+      }
     }
-  }
 
     stage('Pre-Build') {
       steps {
@@ -54,7 +55,19 @@ pipeline {
     stage('QualityGate-99') {
       steps {
         script {
-          def coverage = sh(returnStdout: true, script: "python - <<'PY'\nimport xml.etree.ElementTree as ET\nroot = ET.parse('target/site/jacoco/jacoco.xml').getroot()\nctr = root.find(\"counter[@type='INSTRUCTION']\")\ncovered = float(ctr.get('covered'))\nmissed = float(ctr.get('missed'))\nratio = covered / (covered + missed) if (covered + missed) else 0\nprint(f'{ratio:.4f}')\nPY").trim()
+          def coverage = sh(
+            returnStdout: true,
+            script: """python - <<'PY'
+import xml.etree.ElementTree as ET
+root = ET.parse('target/site/jacoco/jacoco.xml').getroot()
+ctr = root.find("counter[@type='INSTRUCTION']")
+covered = float(ctr.get('covered'))
+missed = float(ctr.get('missed'))
+ratio = covered / (covered + missed) if (covered + missed) else 0
+print(f'{ratio:.4f}')
+PY"""
+          ).trim()
+
           env.QUALITY_OK = (coverage.toBigDecimal() >= 0.99).toString()
           if (env.QUALITY_OK != 'true') {
             error "Coverage below 99% (${coverage})"
@@ -78,7 +91,18 @@ pipeline {
       }
       steps {
         sh "mkdir -p ${TRIVY_CACHE}"
-        sh "docker run --rm -v ${WORKSPACE}/${TRIVY_CACHE}:/root/.cache -v /var/run/docker.sock:/var/run/docker.sock ${TRIVY_IMAGE} image --exit-code 1 --severity HIGH,CRITICAL --no-progress --format table -o trivy-image.txt ${IMAGE_TAG}"
+        sh """
+          docker run --rm \
+            -v ${WORKSPACE}/${TRIVY_CACHE}:/root/.cache \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            ${TRIVY_IMAGE} image \
+              --exit-code 1 \
+              --severity HIGH,CRITICAL \
+              --no-progress \
+              --format table \
+              -o trivy-image.txt \
+              ${IMAGE_TAG}
+        """
       }
     }
 
@@ -99,7 +123,7 @@ pipeline {
       archiveArtifacts artifacts: 'target/site/jacoco/**,target/pmd.xml,trivy-fs.txt,trivy-image.txt', fingerprint: true
     }
     success {
-      echo 'Pipeline concluído com aprovação de 99%+'   
+      echo 'Pipeline concluído com aprovação de 99%+'
     }
   }
 }
