@@ -30,7 +30,7 @@ pipeline {
               --exit-code 1 \
               --no-progress \
               --format table \
-              --skip-dirs /workspace/target,/workspace/.m2,/workspace/.git \
+              --skip-dirs /workspace/target,/workspace/.m2,/workspace/.git,/workspace/bin,/workspace/_backup_single_module_20251103_213806 \
               -o /workspace/trivy-fs.txt \
               /workspace
         """
